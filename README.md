@@ -169,8 +169,8 @@ graph TB
 
 ```bash
 # 1. Git 리포지토리 클론
-git clone <your-repo-url>
-cd customer-trends-mcp
+git clone https://github.com/awskyosej/trendbot.git
+cd trendbot
 
 # 2. 애플리케이션 의존성 설치
 npm install
