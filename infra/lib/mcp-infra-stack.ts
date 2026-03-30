@@ -59,6 +59,9 @@ export class McpInfraStack extends cdk.Stack {
         target: "node20",
         externalModules: ["@aws-sdk/*"],
         forceDockerBundling: false,
+        // CloudShell(ARM64)에서 esbuild 바이너리 호환 문제 방지:
+        // npm install 시 올바른 아키텍처의 esbuild가 설치되도록
+        // 프로젝트 루트의 node_modules 대신 글로벌 또는 로컬 설치를 사용
         esbuildArgs: {},
       },
     });
@@ -97,6 +100,13 @@ export class McpInfraStack extends cdk.Stack {
     // -------------------------------------------------------
     const functionUrl = this.lambdaFunction.addFunctionUrl({
       authType: lambda.FunctionUrlAuthType.NONE,
+    });
+
+    // Function URL NONE 인증 시 퍼블릭 접근을 위한 resource-based policy
+    this.lambdaFunction.addPermission("FunctionUrlPublicAccess", {
+      principal: new iam.StarPrincipal(),
+      action: "lambda:InvokeFunctionUrl",
+      functionUrlAuthType: lambda.FunctionUrlAuthType.NONE,
     });
 
     new cdk.CfnOutput(this, "McpLambdaFunctionUrl", {
