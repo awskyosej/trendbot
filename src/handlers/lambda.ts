@@ -1,22 +1,17 @@
 /**
- * Lambda Handler - HTTP API 엔트리포인트
+ * Lambda Handler - AgentCore Gateway Tool 타겟
  *
- * Lambda Function URL을 통해 HTTP 요청을 받아 Tool을 실행한다.
- * MCP 프로토콜은 로컬 mcp-proxy.js가 처리하고,
- * Lambda는 순수 Tool 실행 API로 동작한다.
+ * AgentCore Gateway가 이 Lambda를 Tool로 호출할 때,
+ * Tool arguments를 event 최상위 레벨로 직접 전달합니다.
+ * 예: { "customer_name": "삼성전자", "search_period": "최근 7일", "include_competitors": true }
  *
- * Requirements: 1.1, 1.2, 3.2, 3.3, 8.1, 8.2, 8.3, 9.4, 9.5
+ * 또한 직접 HTTP 호출(Function URL)도 지원합니다.
+ * 이 경우 event.body에 JSON이 포함됩니다.
  */
 
 import { validateSearchParams } from "../utils/validation.js";
 import { executeTrendSearch } from "../agents/bedrock-client.js";
 import { formatTrendSearchResult } from "../formatters/user-friendly-formatter.js";
-
-interface LambdaEvent {
-  body?: string;
-  headers?: Record<string, string>;
-  requestContext?: Record<string, unknown>;
-}
 
 interface LambdaResponse {
   statusCode: number;
@@ -24,64 +19,44 @@ interface LambdaResponse {
   body: string;
 }
 
-interface ToolRequest {
-  tool: string;
-  arguments: Record<string, unknown>;
-}
-
-/**
- * Lambda Handler
- *
- * Function URL로 들어온 HTTP 요청에서 tool/arguments를 파싱하고
- * 해당 Tool을 실행하여 결과를 반환한다.
- */
-export const handler = async (event: LambdaEvent): Promise<LambdaResponse> => {
+export const handler = async (event: Record<string, unknown>): Promise<LambdaResponse> => {
   const headers = { "Content-Type": "application/json" };
 
   try {
-    // 1. 요청 파싱
-    let requestBody: ToolRequest;
-    try {
-      const body = event.body || "{}";
-      console.log("[Lambda] Raw event:", JSON.stringify(event).substring(0, 500));
-      console.log("[Lambda] Body:", body.substring(0, 500));
-      requestBody = JSON.parse(body) as ToolRequest;
-    } catch {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: "Invalid JSON in request body" }),
-      };
+    console.log("[Lambda] Event:", JSON.stringify(event).substring(0, 500));
+
+    // AgentCore Gateway: arguments가 event 최상위에 직접 전달됨
+    // Function URL: event.body에 JSON으로 래핑됨
+    let args: Record<string, unknown>;
+
+    if (event.body && typeof event.body === "string") {
+      // Function URL 호출
+      try {
+        const parsed = JSON.parse(event.body as string);
+        args = parsed.arguments || parsed;
+      } catch {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: "Invalid JSON" }) };
+      }
+    } else if (event.customer_name || event.search_period) {
+      // AgentCore Gateway 직접 호출
+      args = event;
+    } else {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: "No arguments provided" }) };
     }
 
-    const { tool, arguments: args } = requestBody;
-
-    // 2. Tool 라우팅
-    if (tool !== "search_customer_trends" && tool !== "search-customer-trends") {
-      return {
-        statusCode: 404,
-        headers,
-        body: JSON.stringify({ error: `Tool not found: ${tool}` }),
-      };
-    }
-
-    // 3. 입력 검증
+    // 입력 검증
     const validation = validateSearchParams(args);
     if (!validation.success) {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({
-          error: validation.error,
-          details: validation.details,
-        }),
+        body: JSON.stringify({ error: validation.error, details: validation.details }),
       };
     }
 
     const { customer_name, search_period, include_competitors } = validation.data;
 
-    // 4. Tool 실행
-    console.log(`[Lambda] search_customer_trends 실행: customer=${customer_name}, period=${search_period}`);
+    console.log(`[Lambda] 실행: customer=${customer_name}, period=${search_period}`);
 
     const searchResult = await executeTrendSearch({
       customerName: customer_name,
@@ -89,30 +64,18 @@ export const handler = async (event: LambdaEvent): Promise<LambdaResponse> => {
       includeCompetitors: include_competitors,
     });
 
-    // 5. 결과 포맷팅
     const formatted = formatTrendSearchResult(
-      searchResult,
-      customer_name,
-      search_period,
-      include_competitors,
+      searchResult, customer_name, search_period, include_competitors,
     );
 
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify(formatted),
-    };
+    return { statusCode: 200, headers, body: JSON.stringify(formatted) };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     console.error("[Lambda] 오류:", message);
-
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({
-        error: "Internal server error",
-        message: "트렌드 검색 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.",
-      }),
+      body: JSON.stringify({ error: "Internal server error", message }),
     };
   }
 };
