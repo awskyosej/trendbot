@@ -43,6 +43,8 @@ export const handler = async (event: LambdaEvent): Promise<LambdaResponse> => {
     let requestBody: ToolRequest;
     try {
       const body = event.body || "{}";
+      console.log("[Lambda] Raw event:", JSON.stringify(event).substring(0, 500));
+      console.log("[Lambda] Body:", body.substring(0, 500));
       requestBody = JSON.parse(body) as ToolRequest;
     } catch {
       return {
