@@ -1,22 +1,74 @@
 /**
- * Lambda Handler - AgentCore Gateway Tool 타겟
+ * Lambda Handler - Bedrock 요약/분석 전용 Tool
  *
- * AgentCore Gateway가 이 Lambda를 Tool로 호출할 때,
- * Tool arguments를 event 최상위 레벨로 직접 전달합니다.
- * 예: { "customer_name": "삼성전자", "search_period": "최근 7일", "include_competitors": true }
+ * AgentCore Gateway가 이 Lambda를 Tool로 호출합니다.
+ * 검색은 AgentCore의 브라우저 도구가 담당하고,
+ * 이 Lambda는 텍스트 요약/분석만 수행합니다.
  *
- * 또한 직접 HTTP 호출(Function URL)도 지원합니다.
- * 이 경우 event.body에 JSON이 포함됩니다.
+ * 지원하는 Tool:
+ * - summarize-news: 뉴스 기사 텍스트를 헤드라인 + 50자 요약으로 정리
+ * - summarize-blog: AWS 블로그 텍스트를 분석하여 모범사례 필터링 + 요약
+ * - analyze-competitors: 경쟁사 뉴스 텍스트를 경쟁사별 분류 + 요약
  */
 
-import { validateSearchParams } from "../utils/validation.js";
-import { executeTrendSearch } from "../agents/bedrock-client.js";
-import { formatTrendSearchResult } from "../formatters/user-friendly-formatter.js";
+import {
+  BedrockRuntimeClient,
+  InvokeModelCommand,
+} from "@aws-sdk/client-bedrock-runtime";
+
+const bedrockClient = new BedrockRuntimeClient({
+  region: process.env.BEDROCK_REGION || "us-east-1",
+});
+
+const HAIKU_MODEL = "anthropic.claude-3-haiku-20240307-v1:0";
+const SONNET_MODEL = "anthropic.claude-3-sonnet-20240229-v1:0";
 
 interface LambdaResponse {
   statusCode: number;
   headers?: Record<string, string>;
   body: string;
+}
+
+async function invokeBedrock(modelId: string, system: string, userMessage: string): Promise<string> {
+  const command = new InvokeModelCommand({
+    modelId,
+    contentType: "application/json",
+    accept: "application/json",
+    body: JSON.stringify({
+      anthropic_version: "bedrock-2023-05-31",
+      max_tokens: 4096,
+      system,
+      messages: [{ role: "user", content: userMessage }],
+    }),
+  });
+
+  const response = await bedrockClient.send(command);
+  const body = JSON.parse(new TextDecoder().decode(response.body));
+  return body.content?.[0]?.text || "";
+}
+
+// --- Tool 핸들러 ---
+
+async function summarizeNews(text: string): Promise<string> {
+  const system = `뉴스 기사를 분석하여 각 기사에 대해 JSON 배열로 반환하세요.
+각 항목: { "headline": "헤드라인", "summary": "50자 이내 요약", "source": "출처", "date": "날짜" }
+summary는 반드시 50자 이내. 결과가 없으면 빈 배열 [].`;
+  return await invokeBedrock(HAIKU_MODEL, system, text);
+}
+
+async function summarizeBlog(text: string): Promise<string> {
+  const system = `AWS 블로그 게시물을 분석하세요.
+단순 기능 출시 공지는 제외하고, 아키텍처/구현 모범사례만 선별하세요.
+JSON 배열로 반환: { "headline": "헤드라인", "summary": "50자 이내 요약", "category": "분류", "date": "날짜" }
+summary는 반드시 50자 이내. 모범사례가 없으면 빈 배열 [].`;
+  return await invokeBedrock(SONNET_MODEL, system, text);
+}
+
+async function analyzeCompetitors(text: string): Promise<string> {
+  const system = `경쟁 클라우드 솔루션 뉴스를 분석하여 경쟁사별로 분류하세요.
+JSON 배열로 반환: { "headline": "헤드라인", "summary": "50자 이내 요약", "competitor": "경쟁사명", "date": "날짜" }
+summary는 반드시 50자 이내. 결과가 없으면 빈 배열 [].`;
+  return await invokeBedrock(SONNET_MODEL, system, text);
 }
 
 export const handler = async (event: Record<string, unknown>): Promise<LambdaResponse> => {
@@ -25,57 +77,34 @@ export const handler = async (event: Record<string, unknown>): Promise<LambdaRes
   try {
     console.log("[Lambda] Event:", JSON.stringify(event).substring(0, 500));
 
-    // AgentCore Gateway: arguments가 event 최상위에 직접 전달됨
-    // Function URL: event.body에 JSON으로 래핑됨
-    let args: Record<string, unknown>;
+    const action = (event.action as string) || "";
+    const text = (event.text as string) || "";
 
-    if (event.body && typeof event.body === "string") {
-      // Function URL 호출
-      try {
-        const parsed = JSON.parse(event.body as string);
-        args = parsed.arguments || parsed;
-      } catch {
-        return { statusCode: 400, headers, body: JSON.stringify({ error: "Invalid JSON" }) };
-      }
-    } else if (event.customer_name || event.search_period) {
-      // AgentCore Gateway 직접 호출
-      args = event;
-    } else {
-      return { statusCode: 400, headers, body: JSON.stringify({ error: "No arguments provided" }) };
+    if (!text) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: "text is required" }) };
     }
 
-    // 입력 검증
-    const validation = validateSearchParams(args);
-    if (!validation.success) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: validation.error, details: validation.details }),
-      };
+    let result: string;
+
+    switch (action) {
+      case "summarize-news":
+        result = await summarizeNews(text);
+        break;
+      case "summarize-blog":
+        result = await summarizeBlog(text);
+        break;
+      case "analyze-competitors":
+        result = await analyzeCompetitors(text);
+        break;
+      default:
+        // action이 없으면 범용 요약
+        result = await summarizeNews(text);
     }
 
-    const { customer_name, search_period, include_competitors } = validation.data;
-
-    console.log(`[Lambda] 실행: customer=${customer_name}, period=${search_period}`);
-
-    const searchResult = await executeTrendSearch({
-      customerName: customer_name,
-      searchPeriod: search_period,
-      includeCompetitors: include_competitors,
-    });
-
-    const formatted = formatTrendSearchResult(
-      searchResult, customer_name, search_period, include_competitors,
-    );
-
-    return { statusCode: 200, headers, body: JSON.stringify(formatted) };
+    return { statusCode: 200, headers, body: JSON.stringify({ result }) };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     console.error("[Lambda] 오류:", message);
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: "Internal server error", message }),
-    };
+    return { statusCode: 500, headers, body: JSON.stringify({ error: message }) };
   }
 };
