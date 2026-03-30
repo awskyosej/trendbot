@@ -99,14 +99,7 @@ export class McpInfraStack extends cdk.Stack {
     // Lambda Function URL (Task 12.2)
     // -------------------------------------------------------
     const functionUrl = this.lambdaFunction.addFunctionUrl({
-      authType: lambda.FunctionUrlAuthType.NONE,
-    });
-
-    // Function URL NONE 인증 시 퍼블릭 접근을 위한 resource-based policy
-    this.lambdaFunction.addPermission("FunctionUrlPublicAccess", {
-      principal: new iam.StarPrincipal(),
-      action: "lambda:InvokeFunctionUrl",
-      functionUrlAuthType: lambda.FunctionUrlAuthType.NONE,
+      authType: lambda.FunctionUrlAuthType.AWS_IAM,
     });
 
     new cdk.CfnOutput(this, "McpLambdaFunctionUrl", {
