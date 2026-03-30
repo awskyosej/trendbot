@@ -59,6 +59,7 @@ export class McpInfraStack extends cdk.Stack {
         target: "node20",
         externalModules: ["@aws-sdk/*"],
         forceDockerBundling: false,
+        esbuildArgs: {},
       },
     });
 
@@ -95,7 +96,7 @@ export class McpInfraStack extends cdk.Stack {
     // Lambda Function URL (Task 12.2)
     // -------------------------------------------------------
     const functionUrl = this.lambdaFunction.addFunctionUrl({
-      authType: lambda.FunctionUrlAuthType.AWS_IAM,
+      authType: lambda.FunctionUrlAuthType.NONE,
     });
 
     new cdk.CfnOutput(this, "McpLambdaFunctionUrl", {
