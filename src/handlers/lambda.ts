@@ -159,7 +159,7 @@ export const handler = async (event: Record<string, unknown>): Promise<LambdaRes
 
     let result: string;
 
-    switch (action) {
+    switch (action.replace(/_/g, "-")) {
       // 검색 도구 (Runtime 에이전트 호출)
       case "search-news":
         result = await searchNews(customerName, searchPeriod);
