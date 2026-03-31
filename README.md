@@ -103,26 +103,22 @@ graph TB
             SEARCH[x_amz_bedrock_agentcore_search<br/>웹 검색]
         end
 
-        subgraph "Lambda 타겟 (요약/분석)"
-            T1[summarize-news<br/>뉴스 요약 · Haiku]
-            T2[summarize-blog<br/>블로그 분석 · Sonnet]
-            T3[analyze-competitors<br/>경쟁사 분석 · Sonnet]
+        subgraph "요약/분석 도구"
+            T1[summarize-news<br/>뉴스 요약]
+            T2[summarize-blog<br/>블로그 분석]
+            T3[analyze-competitors<br/>경쟁사 분석]
         end
     end
 
-    subgraph "AWS Services"
-        LAMBDA[Lambda Function]
-        BEDROCK[Amazon Bedrock]
-    end
+    BEDROCK[Amazon Bedrock<br/>Haiku / Sonnet]
 
     GW --> SEARCH
     GW --> T1
     GW --> T2
     GW --> T3
-    T1 --> LAMBDA
-    T2 --> LAMBDA
-    T3 --> LAMBDA
-    LAMBDA --> BEDROCK
+    T1 --> BEDROCK
+    T2 --> BEDROCK
+    T3 --> BEDROCK
 ```
 
 
