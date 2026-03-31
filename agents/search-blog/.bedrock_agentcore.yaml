@@ -1,13 +1,13 @@
-default_agent: search_news_agent
+default_agent: searchblog_Agent
 
 agents:
-  search_news_agent:
-    name: search_news_agent
+  searchblog_Agent:
+    name: searchblog_Agent
     language: python
     node_version: null
     entrypoint: src/main.py
     deployment_type: direct_code_deploy
-    runtime_type: PYTHON_3_12
+    runtime_type: PYTHON_3_10
     platform: linux/amd64
     container_runtime: null
     source_path: src
