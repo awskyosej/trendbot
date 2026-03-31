@@ -1,0 +1,7 @@
+agent:
+  name: search-blog-agent
+  description: "AWS 블로그에서 아키텍처/구현 모범사례를 브라우저 도구로 검색하는 에이전트"
+  entry_point: agent.py
+  framework: strands
+  python_version: "3.12"
+  region: us-east-1
