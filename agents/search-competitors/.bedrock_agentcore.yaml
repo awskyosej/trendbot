@@ -1,8 +1,8 @@
-default_agent: search_competitors_agent
+default_agent: searchcompetitors_Agent
 
 agents:
-  search_competitors_agent:
-    name: search_competitors_agent
+  searchcompetitors_Agent:
+    name: searchcompetitors_Agent
     language: python
     node_version: null
     entrypoint: src/main.py
