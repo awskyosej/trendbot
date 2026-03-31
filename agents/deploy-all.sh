@@ -1,59 +1,51 @@
 #!/bin/bash
-# 3개 검색 에이전트를 AgentCore Runtime에 배포하는 스크립트
-# /tmp/hyperAmber 프로젝트를 템플릿으로 사용합니다.
+# 3개 검색 에이전트를 AgentCore Runtime에 배포
+# agentcore create 템플릿을 사용하여 배포합니다.
 #
-# 사전 조건: /tmp/hyperAmber가 agentcore create로 생성되어 있어야 함
-# 사용법: bash agents/deploy-all.sh
+# 사용법: cd ~/trendbot && bash agents/deploy-all.sh
 
 set -e
 
-TEMPLATE_DIR="/tmp/hyperAmber"
-AGENTS_DIR="$(dirname "$0")"
+TRENDBOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+REGION="us-east-1"
 
-if [ ! -d "$TEMPLATE_DIR" ]; then
-  echo "❌ $TEMPLATE_DIR 가 없습니다. 먼저 agentcore create를 실행하세요."
-  exit 1
-fi
-
-# 에이전트 목록: (이름, 소스 디렉토리)
 declare -a AGENTS=(
-  "search_news_agent:$AGENTS_DIR/search-news"
-  "search_blog_agent:$AGENTS_DIR/search-blog"
-  "search_competitors_agent:$AGENTS_DIR/search-competitors"
+  "searchnews:search-news"
+  "searchblog:search-blog"
+  "searchcompetitors:search-competitors"
 )
 
 for entry in "${AGENTS[@]}"; do
   AGENT_NAME="${entry%%:*}"
   SOURCE_DIR="${entry##*:}"
+  DEPLOY_DIR="/tmp/${AGENT_NAME}"
 
   echo ""
   echo "=========================================="
-  echo "🚀 배포: $AGENT_NAME"
+  echo "🚀 배포: ${AGENT_NAME}_Agent (us-east-1)"
   echo "=========================================="
 
-  # 템플릿 복사
-  DEPLOY_DIR="/tmp/deploy-$AGENT_NAME"
+  # 기존 디렉토리 제거
   rm -rf "$DEPLOY_DIR"
-  cp -r "$TEMPLATE_DIR" "$DEPLOY_DIR"
+
+  # agentcore create로 새 프로젝트 생성 (비대화형)
+  cd /tmp
+  echo -e "strands\n${AGENT_NAME}\n" | agentcore create 2>/dev/null || true
 
   # main.py 교체
-  cp "$SOURCE_DIR/src/main.py" "$DEPLOY_DIR/src/main.py"
+  cp "$TRENDBOT_DIR/agents/$SOURCE_DIR/src/main.py" "$DEPLOY_DIR/src/main.py"
 
-  # yaml에서 에이전트 이름 변경
-  sed -i "s/hyperAmber_Agent/$AGENT_NAME/g" "$DEPLOY_DIR/.bedrock_agentcore.yaml"
-  sed -i "s/default_agent: hyperAmber_Agent/default_agent: $AGENT_NAME/" "$DEPLOY_DIR/.bedrock_agentcore.yaml"
-
-  # 캐시 제거
-  rm -rf "$DEPLOY_DIR/.venv" "$DEPLOY_DIR/uv.lock"
+  # 리전을 us-east-1로 변경
+  cd "$DEPLOY_DIR"
+  sed -i "s/region: .*/region: ${REGION}/" .bedrock_agentcore.yaml
 
   # 배포
-  cd "$DEPLOY_DIR"
   agentcore deploy --auto-update-on-conflict
 
-  echo "✅ $AGENT_NAME 배포 완료"
+  echo "✅ ${AGENT_NAME}_Agent 배포 완료"
+  echo ""
 done
 
-echo ""
 echo "=========================================="
 echo "✅ 모든 에이전트 배포 완료!"
 echo "AgentCore 콘솔에서 Runtime endpoint URL을 확인하고"
