@@ -185,79 +185,78 @@ export class McpInfraStack extends cdk.Stack {
 
     const agentCoreNamespace = "Bedrock-AgentCore";
 
-    // SEARCH 표현식으로 모든 도구 메트릭을 자동 검색
-    // 도구별 Latency - MathExpression SEARCH 사용
-    const latencyWidget = new cdk.aws_cloudwatch.GraphWidget({
-      title: "도구별 Latency (ms)",
-      width: 12,
-      height: 6,
-    });
-    latencyWidget.addLeftMetric(new cdk.aws_cloudwatch.MathExpression({
-      expression: `SEARCH('{${agentCoreNamespace}} MetricName="Latency"', 'Average', 60)`,
-      label: "",
-      period: cdk.Duration.minutes(1),
-    }));
+    const toolNames = [
+      { full: "search-customer-trends___summarize-news", short: "summarize-news" },
+      { full: "search-customer-trends___summarize-blog", short: "summarize-blog" },
+      { full: "search-customer-trends___analyze-competitors", short: "analyze-competitors" },
+    ];
 
-    const durationWidget = new cdk.aws_cloudwatch.GraphWidget({
-      title: "도구별 Duration (ms)",
-      width: 12,
-      height: 6,
-    });
-    durationWidget.addLeftMetric(new cdk.aws_cloudwatch.MathExpression({
-      expression: `SEARCH('{${agentCoreNamespace}} MetricName="Duration"', 'Average', 60)`,
-      label: "",
-      period: cdk.Duration.minutes(1),
-    }));
+    const baseDimensions = {
+      Method: "tools/call",
+      Operation: "InvokeGateway",
+      Protocol: "MCP",
+    };
 
-    dashboard.addWidgets(latencyWidget, durationWidget);
+    function toolMetric(metricName: string, tool: { full: string; short: string }, statistic: string) {
+      return new cdk.aws_cloudwatch.Metric({
+        namespace: agentCoreNamespace,
+        metricName,
+        dimensionsMap: { ...baseDimensions, Name: tool.full },
+        statistic,
+        period: cdk.Duration.minutes(1),
+        label: tool.short,
+      });
+    }
 
-    const targetExecWidget = new cdk.aws_cloudwatch.GraphWidget({
-      title: "도구별 타겟 실행 시간 (ms)",
-      width: 12,
-      height: 6,
-    });
-    targetExecWidget.addLeftMetric(new cdk.aws_cloudwatch.MathExpression({
-      expression: `SEARCH('{${agentCoreNamespace}} MetricName="TargetExecutionTime"', 'Average', 60)`,
-      label: "",
-      period: cdk.Duration.minutes(1),
-    }));
+    // 도구별 Latency
+    dashboard.addWidgets(
+      new cdk.aws_cloudwatch.GraphWidget({
+        title: "도구별 Latency (ms)",
+        left: toolNames.map(t => toolMetric("Latency", t, "Average")),
+        width: 12,
+        height: 6,
+      }),
+      new cdk.aws_cloudwatch.GraphWidget({
+        title: "도구별 Duration (ms)",
+        left: toolNames.map(t => toolMetric("Duration", t, "Average")),
+        width: 12,
+        height: 6,
+      }),
+    );
 
-    const invocationsWidget = new cdk.aws_cloudwatch.GraphWidget({
-      title: "도구별 호출 수",
-      width: 12,
-      height: 6,
-    });
-    invocationsWidget.addLeftMetric(new cdk.aws_cloudwatch.MathExpression({
-      expression: `SEARCH('{${agentCoreNamespace}} MetricName="Invocations"', 'Sum', 60)`,
-      label: "",
-      period: cdk.Duration.minutes(1),
-    }));
-
-    dashboard.addWidgets(targetExecWidget, invocationsWidget);
+    // 도구별 TargetExecutionTime + Invocations
+    dashboard.addWidgets(
+      new cdk.aws_cloudwatch.GraphWidget({
+        title: "도구별 타겟 실행 시간 (ms)",
+        left: toolNames.map(t => toolMetric("TargetExecutionTime", t, "Average")),
+        width: 12,
+        height: 6,
+      }),
+      new cdk.aws_cloudwatch.GraphWidget({
+        title: "도구별 호출 수",
+        left: toolNames.map(t => toolMetric("Invocations", t, "Sum")),
+        width: 12,
+        height: 6,
+      }),
+    );
 
     // 오류/스로틀
-    const errorsWidget = new cdk.aws_cloudwatch.GraphWidget({
-      title: "Gateway 오류",
-      width: 12,
-      height: 6,
-    });
-    errorsWidget.addLeftMetric(new cdk.aws_cloudwatch.MathExpression({
-      expression: `SEARCH('{${agentCoreNamespace}} MetricName="SystemErrors" OR MetricName="UserErrors"', 'Sum', 60)`,
-      label: "",
-      period: cdk.Duration.minutes(1),
-    }));
-
-    const throttlesWidget = new cdk.aws_cloudwatch.GraphWidget({
-      title: "Gateway 스로틀",
-      width: 12,
-      height: 6,
-    });
-    throttlesWidget.addLeftMetric(new cdk.aws_cloudwatch.MathExpression({
-      expression: `SEARCH('{${agentCoreNamespace}} MetricName="Throttles"', 'Sum', 60)`,
-      label: "",
-      period: cdk.Duration.minutes(1),
-    }));
-
-    dashboard.addWidgets(errorsWidget, throttlesWidget);
+    dashboard.addWidgets(
+      new cdk.aws_cloudwatch.GraphWidget({
+        title: "Gateway 오류",
+        left: [
+          ...toolNames.map(t => toolMetric("SystemErrors", t, "Sum")),
+          ...toolNames.map(t => toolMetric("UserErrors", t, "Sum")),
+        ],
+        width: 12,
+        height: 6,
+      }),
+      new cdk.aws_cloudwatch.GraphWidget({
+        title: "Gateway 스로틀",
+        left: toolNames.map(t => toolMetric("Throttles", t, "Sum")),
+        width: 12,
+        height: 6,
+      }),
+    );
   }
 }
