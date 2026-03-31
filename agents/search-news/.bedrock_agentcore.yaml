@@ -1,8 +1,8 @@
-default_agent: search_news_agent
+default_agent: searchnews_Agent
 
 agents:
-  search_news_agent:
-    name: search_news_agent
+  searchnews_Agent:
+    name: searchnews_Agent
     language: python
     node_version: null
     entrypoint: src/main.py
