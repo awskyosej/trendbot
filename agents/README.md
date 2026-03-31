@@ -13,7 +13,7 @@ AgentCore Runtime에 3개의 검색 에이전트를 배포하고, Gateway에 도
 ## 사전 준비
 
 ```bash
-pip install bedrock-agentcore-starter-toolkit
+pip install "bedrock-agentcore[starter-toolkit]" strands-agents
 ```
 
 ## 배포 (각 에이전트별)
