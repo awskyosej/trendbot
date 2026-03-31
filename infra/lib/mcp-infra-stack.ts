@@ -185,90 +185,110 @@ export class McpInfraStack extends cdk.Stack {
 
     const agentCoreNamespace = "Bedrock-AgentCore";
 
+    // 도구 이름 목록
+    const toolNames = [
+      "search-customer-trends___summarize-news",
+      "search-customer-trends___summarize-blog",
+      "search-customer-trends___analyze-competitors",
+    ];
+
+    // 도구별 Latency 비교
     dashboard.addWidgets(
       new cdk.aws_cloudwatch.GraphWidget({
-        title: "Gateway 호출 수",
-        left: [
-          new cdk.aws_cloudwatch.Metric({
-            namespace: agentCoreNamespace,
-            metricName: "Invocations",
-            dimensionsMap: { Operation: "InvokeGateway" },
-            statistic: "Sum",
-            period: cdk.Duration.minutes(5),
-          }),
-        ],
-        width: 8,
-        height: 6,
-      }),
-      new cdk.aws_cloudwatch.GraphWidget({
-        title: "Gateway 오류",
-        left: [
-          new cdk.aws_cloudwatch.Metric({
-            namespace: agentCoreNamespace,
-            metricName: "SystemErrors",
-            dimensionsMap: { Operation: "InvokeGateway" },
-            statistic: "Sum",
-            period: cdk.Duration.minutes(5),
-          }),
-          new cdk.aws_cloudwatch.Metric({
-            namespace: agentCoreNamespace,
-            metricName: "UserErrors",
-            dimensionsMap: { Operation: "InvokeGateway" },
-            statistic: "Sum",
-            period: cdk.Duration.minutes(5),
-          }),
-        ],
-        width: 8,
-        height: 6,
-      }),
-      new cdk.aws_cloudwatch.GraphWidget({
-        title: "Gateway 지연 시간 (ms)",
-        left: [
+        title: "도구별 Latency (ms)",
+        left: toolNames.map(name =>
           new cdk.aws_cloudwatch.Metric({
             namespace: agentCoreNamespace,
             metricName: "Latency",
-            dimensionsMap: { Operation: "InvokeGateway" },
+            dimensionsMap: { Name: name },
             statistic: "Average",
-            period: cdk.Duration.minutes(5),
-          }),
+            period: cdk.Duration.minutes(1),
+            label: name.split("___").pop() || name,
+          })
+        ),
+        width: 12,
+        height: 6,
+      }),
+      new cdk.aws_cloudwatch.GraphWidget({
+        title: "도구별 Duration (ms)",
+        left: toolNames.map(name =>
           new cdk.aws_cloudwatch.Metric({
             namespace: agentCoreNamespace,
             metricName: "Duration",
-            dimensionsMap: { Operation: "InvokeGateway" },
+            dimensionsMap: { Name: name },
             statistic: "Average",
-            period: cdk.Duration.minutes(5),
-          }),
-        ],
-        width: 8,
+            period: cdk.Duration.minutes(1),
+            label: name.split("___").pop() || name,
+          })
+        ),
+        width: 12,
         height: 6,
       }),
     );
 
-    // 도구별 메트릭
+    // 도구별 TargetExecutionTime
     dashboard.addWidgets(
       new cdk.aws_cloudwatch.GraphWidget({
-        title: "도구별 호출 수 (MCP tools/call)",
-        left: [
+        title: "도구별 타겟 실행 시간 (ms)",
+        left: toolNames.map(name =>
+          new cdk.aws_cloudwatch.Metric({
+            namespace: agentCoreNamespace,
+            metricName: "TargetExecutionTime",
+            dimensionsMap: { Name: name },
+            statistic: "Average",
+            period: cdk.Duration.minutes(1),
+            label: name.split("___").pop() || name,
+          })
+        ),
+        width: 12,
+        height: 6,
+      }),
+      new cdk.aws_cloudwatch.GraphWidget({
+        title: "도구별 호출 수",
+        left: toolNames.map(name =>
           new cdk.aws_cloudwatch.Metric({
             namespace: agentCoreNamespace,
             metricName: "Invocations",
-            dimensionsMap: { Method: "tools/call", Protocol: "MCP" },
+            dimensionsMap: { Name: name },
             statistic: "Sum",
-            period: cdk.Duration.minutes(5),
+            period: cdk.Duration.minutes(1),
+            label: name.split("___").pop() || name,
+          })
+        ),
+        width: 12,
+        height: 6,
+      }),
+    );
+
+    // Gateway 전체 오류
+    dashboard.addWidgets(
+      new cdk.aws_cloudwatch.GraphWidget({
+        title: "Gateway 오류 (System + User)",
+        left: [
+          new cdk.aws_cloudwatch.Metric({
+            namespace: agentCoreNamespace,
+            metricName: "SystemErrors",
+            statistic: "Sum",
+            period: cdk.Duration.minutes(1),
+          }),
+          new cdk.aws_cloudwatch.Metric({
+            namespace: agentCoreNamespace,
+            metricName: "UserErrors",
+            statistic: "Sum",
+            period: cdk.Duration.minutes(1),
           }),
         ],
         width: 12,
         height: 6,
       }),
       new cdk.aws_cloudwatch.GraphWidget({
-        title: "타겟 실행 시간 (Lambda)",
+        title: "Gateway 스로틀",
         left: [
           new cdk.aws_cloudwatch.Metric({
             namespace: agentCoreNamespace,
-            metricName: "TargetExecutionTime",
-            dimensionsMap: { Operation: "InvokeGateway" },
-            statistic: "Average",
-            period: cdk.Duration.minutes(5),
+            metricName: "Throttles",
+            statistic: "Sum",
+            period: cdk.Duration.minutes(1),
           }),
         ],
         width: 12,
