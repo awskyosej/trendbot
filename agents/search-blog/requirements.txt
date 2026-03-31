@@ -1,0 +1,5 @@
+bedrock-agentcore
+strands-agents
+browser-use
+langchain-aws
+playwright
