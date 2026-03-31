@@ -1,3 +1,5 @@
 bedrock-agentcore
 strands-agents
-strands-agents-tools-browser
+browser-use
+langchain-aws
+playwright
