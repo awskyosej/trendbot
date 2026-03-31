@@ -3,13 +3,12 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "search-news-agent"
+name = "search-blog-agent"
 version = "0.1.0"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
   "bedrock-agentcore >= 1.0.3",
   "boto3 >= 1.38.0",
   "strands-agents >= 1.13.0",
-  "browser-use",
-  "langchain-aws",
+  "strands-agents-tools >= 0.2.16",
 ]
