@@ -51,7 +51,7 @@ async function invokeBedrock(modelId: string, system: string, userMessage: strin
 
 async function summarizeNews(text: string): Promise<string> {
   const system = `뉴스 기사를 분석하여 각 기사에 대해 JSON 배열로 반환하세요.
-각 항목: { "headline": "헤드라인", "summary": "50자 이내 요약", "source": "출처", "date": "날짜" }
+각 항목: { "headline": "헤드라인", "summary": "50자 이내 요약", "source": "출처", "date": "날짜" , "URL": "URL"}
 summary는 반드시 50자 이내. 결과가 없으면 빈 배열 [].`;
   return await invokeBedrock(HAIKU_MODEL, system, text);
 }
@@ -85,7 +85,7 @@ JSON 배열로 반환:
 
 async function analyzeCompetitors(text: string): Promise<string> {
   const system = `경쟁 클라우드 솔루션 뉴스를 분석하여 경쟁사별로 분류하세요.
-JSON 배열로 반환: { "headline": "헤드라인", "summary": "50자 이내 요약", "competitor": "경쟁사명", "date": "날짜" }
+JSON 배열로 반환: { "headline": "헤드라인", "summary": "50자 이내 요약", "competitor": "경쟁사명", "date": "날짜", "URL": "URL" }
 summary는 반드시 50자 이내. 결과가 없으면 빈 배열 [].`;
   return await invokeBedrock(SONNET_MODEL, system, text);
 }
