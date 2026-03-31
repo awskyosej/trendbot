@@ -183,7 +183,8 @@ export class McpInfraStack extends cdk.Stack {
       })
     );
 
-    const agentCoreNamespace = "Bedrock-AgentCore";
+    const agentCoreNamespace = "AWS/Bedrock-AgentCore";
+    const gatewayResource = "arn:aws:bedrock-agentcore:us-east-1:741003918982:gateway/trendbot-gateway-mrmagznjjg";
 
     const toolNames = [
       { full: "search-customer-trends___summarize-news", short: "summarize-news" },
@@ -192,8 +193,9 @@ export class McpInfraStack extends cdk.Stack {
     ];
 
     const baseDimensions = {
-      Method: "tools/call",
+      Resource: gatewayResource,
       Operation: "InvokeGateway",
+      Method: "tools/call",
       Protocol: "MCP",
     };
 
