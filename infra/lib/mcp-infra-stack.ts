@@ -52,6 +52,9 @@ export class McpInfraStack extends cdk.Stack {
         S3_BUCKET_NAME: this.newsBucket.bucketName,
         BEDROCK_REGION: "us-east-1",
         AGENTCORE_ENDPOINT: "",
+        SEARCH_NEWS_AGENT_ARN: "arn:aws:bedrock-agentcore:us-east-1:741003918982:runtime/searchNews_Agent-g814pI6RDz",
+        SEARCH_BLOG_AGENT_ARN: "arn:aws:bedrock-agentcore:us-east-1:741003918982:runtime/searchBlog_Agent-Ibm4PYFK4q",
+        SEARCH_COMPETITORS_AGENT_ARN: "arn:aws:bedrock-agentcore:us-east-1:741003918982:runtime/searchCompetitors_Agent-5J0BlMEFDu",
       },
       bundling: {
         minify: true,
@@ -92,6 +95,19 @@ export class McpInfraStack extends cdk.Stack {
         effect: iam.Effect.ALLOW,
         actions: ["bedrock:InvokeAgent"],
         resources: ["*"],
+      })
+    );
+
+    // -------------------------------------------------------
+    // AgentCore Runtime InvokeAgentRuntime permission
+    // -------------------------------------------------------
+    this.lambdaFunction.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ["bedrock-agentcore:InvokeAgentRuntime"],
+        resources: [
+          "arn:aws:bedrock-agentcore:us-east-1:741003918982:runtime/*",
+        ],
       })
     );
 
