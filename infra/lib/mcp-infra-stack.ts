@@ -106,5 +106,174 @@ export class McpInfraStack extends cdk.Stack {
       value: functionUrl.url,
       description: "Lambda Function URL for MCP server (use for Kiro IDE MCP registration)",
     });
+
+    // -------------------------------------------------------
+    // CloudWatch Dashboard - AgentCore + Lambda 모니터링
+    // -------------------------------------------------------
+    const gatewayArn = new cdk.CfnParameter(this, "AgentCoreGatewayArn", {
+      type: "String",
+      default: "",
+      description: "AgentCore Gateway ARN (대시보드 메트릭 필터용, 선택)",
+    });
+
+    const dashboard = new cdk.aws_cloudwatch.Dashboard(this, "McpDashboard", {
+      dashboardName: "CustomerTrends-MCP-Dashboard",
+    });
+
+    // Lambda 메트릭
+    const lambdaInvocations = this.lambdaFunction.metricInvocations({ period: cdk.Duration.minutes(5) });
+    const lambdaErrors = this.lambdaFunction.metricErrors({ period: cdk.Duration.minutes(5) });
+    const lambdaDuration = this.lambdaFunction.metricDuration({ period: cdk.Duration.minutes(5) });
+    const lambdaThrottles = this.lambdaFunction.metricThrottles({ period: cdk.Duration.minutes(5) });
+
+    dashboard.addWidgets(
+      new cdk.aws_cloudwatch.TextWidget({
+        markdown: "# Customer Trends MCP Server - 모니터링 대시보드",
+        width: 24,
+        height: 1,
+      })
+    );
+
+    // Lambda 섹션
+    dashboard.addWidgets(
+      new cdk.aws_cloudwatch.TextWidget({
+        markdown: "## Lambda Function (Bedrock 요약/분석)",
+        width: 24,
+        height: 1,
+      })
+    );
+
+    dashboard.addWidgets(
+      new cdk.aws_cloudwatch.GraphWidget({
+        title: "Lambda 호출 수 & 오류",
+        left: [lambdaInvocations],
+        right: [lambdaErrors],
+        width: 12,
+        height: 6,
+      }),
+      new cdk.aws_cloudwatch.GraphWidget({
+        title: "Lambda 실행 시간 (ms)",
+        left: [lambdaDuration],
+        width: 12,
+        height: 6,
+      }),
+    );
+
+    dashboard.addWidgets(
+      new cdk.aws_cloudwatch.GraphWidget({
+        title: "Lambda 스로틀",
+        left: [lambdaThrottles],
+        width: 12,
+        height: 6,
+      }),
+      new cdk.aws_cloudwatch.SingleValueWidget({
+        title: "Lambda 요약",
+        metrics: [lambdaInvocations, lambdaErrors, lambdaDuration],
+        width: 12,
+        height: 6,
+      }),
+    );
+
+    // AgentCore Gateway 섹션 (Bedrock-AgentCore 네임스페이스)
+    dashboard.addWidgets(
+      new cdk.aws_cloudwatch.TextWidget({
+        markdown: "## AgentCore Gateway\n\n메트릭은 `Bedrock-AgentCore` 네임스페이스에서 자동 발행됩니다. Gateway 배포 후 데이터가 표시됩니다.",
+        width: 24,
+        height: 1,
+      })
+    );
+
+    const agentCoreNamespace = "Bedrock-AgentCore";
+
+    dashboard.addWidgets(
+      new cdk.aws_cloudwatch.GraphWidget({
+        title: "Gateway 호출 수",
+        left: [
+          new cdk.aws_cloudwatch.Metric({
+            namespace: agentCoreNamespace,
+            metricName: "Invocations",
+            dimensionsMap: { Operation: "InvokeGateway" },
+            statistic: "Sum",
+            period: cdk.Duration.minutes(5),
+          }),
+        ],
+        width: 8,
+        height: 6,
+      }),
+      new cdk.aws_cloudwatch.GraphWidget({
+        title: "Gateway 오류",
+        left: [
+          new cdk.aws_cloudwatch.Metric({
+            namespace: agentCoreNamespace,
+            metricName: "SystemErrors",
+            dimensionsMap: { Operation: "InvokeGateway" },
+            statistic: "Sum",
+            period: cdk.Duration.minutes(5),
+          }),
+          new cdk.aws_cloudwatch.Metric({
+            namespace: agentCoreNamespace,
+            metricName: "UserErrors",
+            dimensionsMap: { Operation: "InvokeGateway" },
+            statistic: "Sum",
+            period: cdk.Duration.minutes(5),
+          }),
+        ],
+        width: 8,
+        height: 6,
+      }),
+      new cdk.aws_cloudwatch.GraphWidget({
+        title: "Gateway 지연 시간 (ms)",
+        left: [
+          new cdk.aws_cloudwatch.Metric({
+            namespace: agentCoreNamespace,
+            metricName: "Latency",
+            dimensionsMap: { Operation: "InvokeGateway" },
+            statistic: "Average",
+            period: cdk.Duration.minutes(5),
+          }),
+          new cdk.aws_cloudwatch.Metric({
+            namespace: agentCoreNamespace,
+            metricName: "Duration",
+            dimensionsMap: { Operation: "InvokeGateway" },
+            statistic: "Average",
+            period: cdk.Duration.minutes(5),
+          }),
+        ],
+        width: 8,
+        height: 6,
+      }),
+    );
+
+    // 도구별 메트릭
+    dashboard.addWidgets(
+      new cdk.aws_cloudwatch.GraphWidget({
+        title: "도구별 호출 수 (MCP tools/call)",
+        left: [
+          new cdk.aws_cloudwatch.Metric({
+            namespace: agentCoreNamespace,
+            metricName: "Invocations",
+            dimensionsMap: { Method: "tools/call", Protocol: "MCP" },
+            statistic: "Sum",
+            period: cdk.Duration.minutes(5),
+          }),
+        ],
+        width: 12,
+        height: 6,
+      }),
+      new cdk.aws_cloudwatch.GraphWidget({
+        title: "타겟 실행 시간 (Lambda)",
+        left: [
+          new cdk.aws_cloudwatch.Metric({
+            namespace: agentCoreNamespace,
+            metricName: "TargetExecutionTime",
+            dimensionsMap: { Operation: "InvokeGateway" },
+            statistic: "Average",
+            period: cdk.Duration.minutes(5),
+          }),
+        ],
+        width: 12,
+        height: 6,
+      }),
+    );
   }
 }
